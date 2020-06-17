@@ -12,7 +12,7 @@ pub type ValidatorDuty = ValidatorDutyBase<PublicKey>;
 
 #[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub struct ValidatorDutyBase<T> {
-    /// The validator's BLS public key, uniquely identifying them. _48-bytes, hex encoded with 0x prefix, case insensitive._
+    /// The validator's BLS public key, uniquely identifying them.
     pub validator_pubkey: T,
     /// The validator's index in `state.validators`
     pub validator_index: Option<u64>,
@@ -23,7 +23,9 @@ pub struct ValidatorDutyBase<T> {
     /// The position of the validator in the committee.
     pub attestation_committee_position: Option<usize>,
     /// The slots in which a validator must propose a block (can be empty).
-    pub block_proposal_slots: Vec<Slot>,
+    ///
+    /// Should be set to `None` when duties are not yet known (before the current epoch).
+    pub block_proposal_slots: Option<Vec<Slot>>,
     /// This provides the modulo: `max(1, len(committee) // TARGET_AGGREGATORS_PER_COMMITTEE)`
     /// which allows the validator client to determine if this duty requires the validator to be
     /// aggregate attestations.

@@ -1284,6 +1284,47 @@ fn prunes_skipped_slots_states() {
     }
 }
 
+// Check that the effective balance of validators can change in a single epoch.
+#[test]
+fn effective_balance_change() {
+    use types::test_utils::*;
+
+    let db_path = tempdir().unwrap();
+    let store = get_store(&db_path);
+    let harness = get_harness(store.clone(), LOW_VALIDATOR_COUNT);
+    let spec = &harness.chain.spec;
+
+    // A state from epoch 0.
+    let state0 = harness.chain.head().unwrap().beacon_state;
+
+    // Slash a validator.
+    let slashed_validator = 0_usize;
+    let slashing = TestingProposerSlashingBuilder::double_vote::<E>(
+        ProposerSlashingTestTask::Valid,
+        slashed_validator as u64,
+        &harness.keypairs[slashed_validator].sk,
+        &state0.fork,
+        state0.genesis_validators_root,
+        spec,
+    );
+
+    harness.chain.process_proposer_slashing(slashing).unwrap();
+
+    harness.extend_chain(
+        E::slots_per_epoch() as usize,
+        BlockStrategy::OnCanonicalHead,
+        AttestationStrategy::AllValidators,
+    );
+
+    let state1 = harness.chain.head().unwrap().beacon_state;
+
+    assert!(state1.validators[slashed_validator].slashed);
+    assert_ne!(
+        state0.validators[slashed_validator].effective_balance,
+        state1.validators[slashed_validator].effective_balance,
+    );
+}
+
 /// Check that the head state's slot matches `expected_slot`.
 fn check_slot(harness: &TestHarness, expected_slot: u64) {
     let state = &harness.chain.head().expect("should get head").beacon_state;

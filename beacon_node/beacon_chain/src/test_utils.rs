@@ -277,19 +277,20 @@ where
                 self.advance_slot();
             }
 
-            let (block, new_state) = self.build_block(state.clone(), slot, block_strategy);
+            if let Some((block, new_state)) = self.build_block(state.clone(), slot, block_strategy)
+            {
+                let block_root = self
+                    .chain
+                    .process_block(block)
+                    .expect("should not error during block processing");
 
-            let block_root = self
-                .chain
-                .process_block(block)
-                .expect("should not error during block processing");
+                self.chain.fork_choice().expect("should find head");
+                head_block_root = Some(block_root);
 
-            self.chain.fork_choice().expect("should find head");
-            head_block_root = Some(block_root);
+                self.add_attestations_for_slot(&attestation_strategy, &new_state, block_root, slot);
 
-            self.add_attestations_for_slot(&attestation_strategy, &new_state, block_root, slot);
-
-            state = new_state;
+                state = new_state;
+            }
             slot += 1;
         }
 
@@ -319,7 +320,9 @@ where
             self.advance_slot();
         }
 
-        let (block, new_state) = self.build_block(state.clone(), slot, block_strategy);
+        let (block, new_state) = self
+            .build_block(state.clone(), slot, block_strategy)
+            .unwrap();
 
         let block_root = self
             .chain
@@ -419,7 +422,7 @@ where
         mut state: BeaconState<E>,
         slot: Slot,
         block_strategy: BlockStrategy,
-    ) -> (SignedBeaconBlock<E>, BeaconState<E>) {
+    ) -> Option<(SignedBeaconBlock<E>, BeaconState<E>)> {
         if slot < state.slot {
             panic!("produce slot cannot be prior to the state slot");
         }
@@ -458,11 +461,11 @@ where
         let (block, state) = self
             .chain
             .produce_block_on_state(state, slot, randao_reveal)
-            .expect("should produce block");
+            .ok()?;
 
         let signed_block = block.sign(sk, &state.fork, state.genesis_validators_root, &self.spec);
 
-        (signed_block, state)
+        Some((signed_block, state))
     }
 
     /// A list of attestations for each committee for the given slot.

@@ -169,8 +169,14 @@ impl DutiesStore {
             .filter(|(_validator_pubkey, validator_map)| {
                 validator_map
                     .get(&epoch)
-                    .map(|duties| !duties.duty.block_proposal_slots.is_empty())
-                    .unwrap_or_else(|| false)
+                    .map(|duties| {
+                        duties
+                            .duty
+                            .block_proposal_slots
+                            .as_ref()
+                            .map_or(false, |proposal_slots| !proposal_slots.is_empty())
+                    })
+                    .unwrap_or(false)
             })
             .count()
     }
@@ -199,7 +205,7 @@ impl DutiesStore {
                 let epoch = slot.epoch(slots_per_epoch);
 
                 validator_map.get(&epoch).and_then(|duties| {
-                    if duties.duty.block_proposal_slots.contains(&slot) {
+                    if duties.duty.block_proposal_slots.as_ref()?.contains(&slot) {
                         Some(duties.duty.validator_pubkey.clone())
                     } else {
                         None
@@ -685,8 +691,9 @@ fn duties_match_epoch(duties: &ValidatorDuty, epoch: Epoch, slots_per_epoch: u64
     duties
         .attestation_slot
         .map_or(true, |slot| slot.epoch(slots_per_epoch) == epoch)
-        && duties
-            .block_proposal_slots
-            .iter()
-            .all(|slot| slot.epoch(slots_per_epoch) == epoch)
+        && duties.block_proposal_slots.as_ref().map_or(true, |slots| {
+            slots
+                .iter()
+                .all(|slot| slot.epoch(slots_per_epoch) == epoch)
+        })
 }
